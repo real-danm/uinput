@@ -62,6 +62,11 @@ type Gamepad interface {
 	HatRelease(direction HatDirection) error
 
 	io.Closer
+
+	// LeftTriggerForce performs a trigger-axis-z event with a given force
+	LeftTriggerForce(value float32) error
+	// RightTriggerForce performs a trigger-axis-rz event with a given force
+	RightTriggerForce(value float32) error
 }
 
 type vGamepad struct {
@@ -123,6 +128,14 @@ func (vg vGamepad) RightStickMoveX(value float32) error {
 
 func (vg vGamepad) RightStickMoveY(value float32) error {
 	return vg.sendStickAxisEvent(absRY, value)
+}
+
+func (vg vGamepad) LeftTriggerForce(value float32) error {
+	return vg.sendStickAxisEvent(absZ, value)
+}
+
+func (vg vGamepad) RightTriggerForce(value float32) error {
+	return vg.sendStickAxisEvent(absRZ, value)
 }
 
 func (vg vGamepad) RightStickMove(x, y float32) error {
@@ -289,6 +302,27 @@ func createVGamepadDevice(path string, name []byte, vendor uint16, product uint1
 		absHat0Y,
 	}
 
+	//tell uinput what the minimum/maximum abs value is
+	var absMin [absSize]int32
+	absMin[absX] = -MaximumAxisValue
+	absMin[absY] = -MaximumAxisValue
+	absMin[absZ] = -MaximumAxisValue
+	absMin[absRX] = -MaximumAxisValue
+	absMin[absRY] = -MaximumAxisValue
+	absMin[absRZ] = -MaximumAxisValue
+	absMin[absHat0X] = -1
+	absMin[absHat0Y] = -1
+
+	var absMax [absSize]int32
+	absMax[absX] = MaximumAxisValue
+	absMax[absY] = MaximumAxisValue
+	absMax[absZ] = MaximumAxisValue
+	absMax[absRX] = MaximumAxisValue
+	absMax[absRY] = MaximumAxisValue
+	absMax[absRZ] = MaximumAxisValue
+	absMax[absHat0X] = 1
+	absMax[absHat0Y] = 1
+
 	deviceFile, err := createDeviceFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create virtual gamepad device: %v", err)
@@ -331,7 +365,11 @@ func createVGamepadDevice(path string, name []byte, vendor uint16, product uint1
 				Bustype: busUsb,
 				Vendor:  vendor,
 				Product: product,
-				Version: 1}})
+				Version: 1,
+			},
+			Absmin: absMin,
+			Absmax: absMax,
+		})
 }
 
 // Takes in a normalized value (-1.0:1.0) and return an event value
